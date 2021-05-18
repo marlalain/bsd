@@ -31,40 +31,88 @@ install() {
         doing "Installing ${1}..." "-"
         doas make install 1>/dev/null
     else
-        skipping "${1} is already installed, skipping..."
+        skipping "${1} is already installed, skipping..." "-"
     fi
     okay "Finished actions for ${1}"
     echo ""
 }
+package_install() {
+    doing "Checking for ${1}..."
+    if ! command -v ${1} 1>/dev/null; then
+        if [ $TARGET == "FreeBSD" ]; then
+            pkg install $1 -y
+        fi
+    else
+        skipping "${1} is already installed, skipping..." "-"
+    fi
+    okay "Finished actions for ${1}"
+    echo ""
+}
+check_folder() {
+    if [ ! -d $1 ]; then
+        doing "Creating ${1} folder..."
+        mkdir -p $1
+    else
+        skipping "Folder ${1} already exists, skipping..."
+    fi
+}
+check_folder_git() {
+    doing "Checking for '$2'..."
+    if [ ! -d $2 ]; then
+        doing "Fetching '$2'..." "-"
+        git clone $1 $2
+    else
+        skipping "'$2' already exists, skipping..." "-"
+    fi
+}
+file_symlink() {
+    doing "Checking file '${1}'..."
+    if [ ! -x "~/."$1 ]; then
+        doing "Creating symlink for '${1}'" "-"
+        ln -sf ~/.dotfiles/$1 ~/.$1
+    else
+        skipping "File already exists, skipping..." "-"
+    fi
+}
+folder_symlink() {
+    doing "Checking folder '${1}'..."
+    if [ ! -d "~/."$1 ]; then
+        doing "Creating symlink for '${1}'" "-"
+        ln -sf ~/.dotfiles/$1 ~/.$1
+    else
+        skipping "Folder already exists, skipping..." "-"
+    fi
+}
 
-echo "New Install Script"
+clear
+echo "New Install POSIX Script"
 echo "Get it at: https://github.com/paulo-e/new-install"
 echo ""
-notice "Only FreeBSD is currently supported"
-notice "Running FreeBSD script"
 OWNER="paulo-e"
 notice "Repository owner set to ${OWNER} (https://github.com/${OWNER}/)"
 SRC="$HOME/.local/src"
 notice "Default source folder set to ${SRC}"
 echo ""
 
+notice "Only FreeBSD is currently supported"
+if [ ! $(uname -s) == FreeBSD ]; then
+    exit;
+else
+    notice "Running script as FreeBSD"
+    TARGET=FreeBSD
+fi
+echo ""
+
 # install basic graphics stuff
 #doas pkg install xorg xf86-video-intel kmod-drm -y
 
+# dotfiles
+check_folder_git https://github.com/$OWNER/dotfiles ~/.dotfiles
+
 # creates $SRC folder
-[ ! -d $SRC ] && doing "Creating ${SRC} folder..." && mkdir -p $SRC
-[ -d $SRC ] && skipping "${SRC} already exists, skipping..."
-echo ""
+check_folder $SRC
 
 # dwm
-# doing "Checking for dwm..."
-# if ! command -v dwm &> /dev/null; then
-#     doing "Fetching dwm..." "-"
-#     git clone https:/github.com/${OWNER}/dwm ~/.local/src/dwm
-#     cd $SRC/dwm
-#     doing "Installing dwm..." "-"
-#     doas make install 1>/dev/null
-# fi
 install dwm
 
 # tabbed
@@ -75,14 +123,14 @@ install tabbed
 doing "Checking for surf..."
 if ! command -v surf 1>/dev/null; then
     notice "'surf' not found. Installing it now..."
-    doing "Checking for portmaster..."
+    doing "Checking for portmaster..." "-"
     if ! command -v portmaster 1>/dev/null; then
         notice "'portmaster' not found. Installing it now..."
         cd /usr/ports/ports-mgmt/portmaster
         doing "Installing portmaster..." "-"
         doas make install       # delete later
     else
-        skipping "'portmaster' is already installed, skipping..."
+        skipping "'portmaster' is already installed, skipping..." "--"
     fi
 
     doing "Installing surf from ports..." "-"
@@ -91,4 +139,29 @@ if ! command -v surf 1>/dev/null; then
 
     doing "Installing surf..." "-"
     git clone https://github.com/${OWNER}/surf ~/.local/src/surf/
+else
+    skipping "'surf' is already installed, skipping..." "-"
 fi
+okay "Finished actions for 'surf'"
+echo ""
+
+# zsh
+file_symlink zshrc
+folder_symlink zsh
+package_install zsh
+
+# tmux
+file_symlink tmux.conf
+folder_symlink tmux
+check_folder_git ~/.tmux/plugins/tpm https://github.com/tmux-plugins/tmp
+package_install tmux
+
+# profiles, etc
+file_symlink profile
+file_symlink xprofile
+file_symlink xinirc
+
+folder_symlink local/bin
+folder_symlink config
+
+okay "Done"
